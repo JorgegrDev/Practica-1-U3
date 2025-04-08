@@ -69,12 +69,15 @@ async function cargarNotas() {
         const cursor = event.target.result;
         if (cursor) {
             const li = document.createElement("li");
+            li.className = "list-group-item list-group-item-action mb-2 shadow-sm";
             const nota = cursor.value;
             let texto = nota.texto;
             if (nota.ubicacion) {
-                texto += ` (${nota.ubicacion.latitude.toFixed(4)}, ${nota.ubicacion.longitude.toFixed(4)})`;
+                texto += `<small class="text-muted d-block mt-2">
+                    📍 Ubicación: ${nota.ubicacion.latitude.toFixed(4)}, ${nota.ubicacion.longitude.toFixed(4)}
+                </small>`;
             }
-            li.textContent = texto;
+            li.innerHTML = texto;
             lista.appendChild(li);
             cursor.continue();
         }
