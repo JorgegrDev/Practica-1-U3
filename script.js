@@ -28,6 +28,12 @@ function initDB() {
     });
 }
 
+function sanitizeInput(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 async function solicitarUbicacion() {
     try {
         // Check if geolocation is supported
@@ -95,7 +101,7 @@ async function solicitarUbicacion() {
         const city = addressComponents.find(c => c.types.includes("locality"))?.long_name || "";
 
         const notaObj = {
-            texto: document.getElementById('nota').value,
+            texto: sanitizeInput(document.getElementById('nota').value),
             fecha: new Date().toISOString(),
             ubicacion: {
                 latitude: position.coords.latitude,
@@ -123,31 +129,63 @@ async function solicitarUbicacion() {
     }
 }
 
-async function cargarNotas() {
-    if (!db) {
-        await initDB();
-    }
-    const lista = document.getElementById("listaNotas");
-    lista.innerHTML = "";
-    const transaction = db.transaction(["notas"], "readonly");
-    const store = transaction.objectStore("notas");
-    store.openCursor().onsuccess = event => {
-        const cursor = event.target.result;
-        if (cursor) {
-            const li = document.createElement("li");
-            li.className = "list-group-item list-group-item-action mb-2 shadow-sm";
-            const nota = cursor.value;
-            let texto = nota.texto;
-            if (nota.ubicacion) {
-                texto += `<small class="text-muted d-block mt-2">
-                    📍 ${nota.ubicacion.ciudad}, ${nota.ubicacion.estado}, ${nota.ubicacion.pais}
-                </small>`;
-            }
-            li.innerHTML = texto;
-            lista.appendChild(li);
-            cursor.continue();
+const NOTAS_POR_PAGINA = 10; // Number of notes to load at once
+let ultimoCursor = null;
+let cargandoNotas = false;
+
+async function cargarNotas(cargarMas = false) {
+    if (!db || cargandoNotas) return;
+    
+    try {
+        cargandoNotas = true;
+        const lista = document.getElementById("listaNotas");
+        
+        if (!cargarMas) {
+            lista.innerHTML = "";
+            ultimoCursor = null;
         }
-    };
+
+        const transaction = db.transaction(["notas"], "readonly");
+        const store = transaction.objectStore("notas");
+        
+        let advanced = !ultimoCursor;
+        const cursorRequest = store.openCursor(ultimoCursor);
+        let contadorNotas = 0;
+
+        cursorRequest.onsuccess = event => {
+            const cursor = event.target.result;
+            if (!cursor || contadorNotas >= NOTAS_POR_PAGINA) {
+                cargandoNotas = false;
+                return;
+            }
+
+            if (advanced) {
+                const li = document.createElement("li");
+                li.className = "list-group-item list-group-item-action mb-2 shadow-sm";
+                const nota = cursor.value;
+                
+                const textNode = document.createTextNode(nota.texto);
+                li.appendChild(textNode);
+                
+                if (nota.ubicacion) {
+                    const ubicacionSpan = document.createElement('small');
+                    ubicacionSpan.className = 'text-muted d-block mt-2';
+                    ubicacionSpan.textContent = `📍 ${nota.ubicacion.ciudad}, ${nota.ubicacion.estado}, ${nota.ubicacion.pais}`;
+                    li.appendChild(ubicacionSpan);
+                }
+                
+                lista.appendChild(li);
+                contadorNotas++;
+                ultimoCursor = cursor.key;
+            }
+            advanced = true;
+            cursor.continue();
+        };
+
+    } catch (error) {
+        console.error('Error loading notes:', error);
+        cargandoNotas = false;
+    }
 }
 
 async function limpiarNotas() {
@@ -183,6 +221,28 @@ async function limpiarNotas() {
             alert("Error al limpiar las notas. Por favor, intenta de nuevo.");
         }
     }
+}
+
+function setupInfiniteScroll() {
+    const options = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting && !cargandoNotas) {
+                cargarNotas(true);
+            }
+        });
+    }, options);
+
+    // Add a sentinel element at the bottom of the list
+    const sentinel = document.createElement('div');
+    sentinel.className = 'sentinel';
+    document.getElementById('listaNotas').after(sentinel);
+    observer.observe(sentinel);
 }
 
 // For testing purposes
