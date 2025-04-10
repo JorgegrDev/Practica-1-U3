@@ -1,3 +1,10 @@
+import {
+    getAuth,
+    signInWithPopup,
+    GoogleAuthProvider,
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+
 let db;
 
 function initAuthDB() {
