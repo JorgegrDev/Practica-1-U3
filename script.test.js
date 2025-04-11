@@ -13,6 +13,8 @@ describe('Note Taking App', () => {
     });
 
     test('guardarNota should save a note to IndexedDB', async () => {
+        expect.assertions(2);
+        
         // Setup
         const testNote = "Test note";
         document.getElementById('nota').value = testNote;
@@ -21,12 +23,11 @@ describe('Note Taking App', () => {
         await guardarNota();
         
         // Assert
-        const db = await initDB();
-        const transaction = db.transaction(['notas'], 'readonly');
-        const store = transaction.objectStore('notas');
-        const request = store.getAll();
-        
         return new Promise((resolve) => {
+            const transaction = db.transaction(['notas'], 'readonly');
+            const store = transaction.objectStore('notas');
+            const request = store.getAll();
+            
             request.onsuccess = () => {
                 expect(request.result.length).toBe(1);
                 expect(request.result[0].texto).toBe(testNote);

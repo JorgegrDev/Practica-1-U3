@@ -5,6 +5,7 @@ async function initDB() {
         const request = indexedDB.open("NotasDB", 1);
         
         request.onerror = () => reject(request.error);
+        
         request.onsuccess = () => {
             db = request.result;
             resolve(db);
@@ -121,13 +122,37 @@ async function solicitarUbicacion() {
 }
 
 async function guardarNota() {
-    if (!db) {
-        await initDB();
+    try {
+        if (!db) {
+            await initDB();
+        }
+        
+        const nota = document.getElementById('nota').value;
+        if (!nota.trim()) {
+            throw new Error('La nota no puede estar vacía');
+        }
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['notas'], 'readwrite');
+            const store = transaction.objectStore('notas');
+            
+            const request = store.add({
+                texto: nota,
+                fecha: new Date().toISOString()
+            });
+
+            request.onsuccess = () => {
+                document.getElementById('nota').value = '';
+                cargarNotas(); // Refresh the notes list
+                resolve(request.result);
+            };
+
+            request.onerror = () => reject(request.error);
+        });
+    } catch (error) {
+        console.error('Error saving note:', error);
+        throw error;
     }
-    const nota = document.getElementById('nota').value;
-    const transaction = db.transaction(['notas'], 'readwrite');
-    const store = transaction.objectStore('notas');
-    return store.add({ texto: nota, fecha: new Date().toISOString() });
 }
 
 const NOTAS_POR_PAGINA = 10; // Number of notes to load at once
@@ -135,57 +160,28 @@ let ultimoCursor = null;
 let cargandoNotas = false;
 
 async function cargarNotas(cargarMas = false) {
-    if (!db || cargandoNotas) return;
-    
     try {
-        cargandoNotas = true;
-        const lista = document.getElementById("listaNotas");
-        
-        if (!cargarMas) {
-            lista.innerHTML = "";
-            ultimoCursor = null;
+        if (!db) {
+            await initDB();
         }
 
+        const lista = document.getElementById("listaNotas");
+        lista.innerHTML = "";
+        
         const transaction = db.transaction(["notas"], "readonly");
         const store = transaction.objectStore("notas");
-        
-        let advanced = !ultimoCursor;
-        const cursorRequest = store.openCursor(ultimoCursor);
-        let contadorNotas = 0;
+        const request = store.getAll();
 
-        cursorRequest.onsuccess = event => {
-            const cursor = event.target.result;
-            if (!cursor || contadorNotas >= NOTAS_POR_PAGINA) {
-                cargandoNotas = false;
-                return;
-            }
-
-            if (advanced) {
+        request.onsuccess = () => {
+            request.result.forEach(nota => {
                 const li = document.createElement("li");
-                li.className = "list-group-item list-group-item-action mb-2 shadow-sm";
-                const nota = cursor.value;
-                
-                const textNode = document.createTextNode(nota.texto);
-                li.appendChild(textNode);
-                
-                if (nota.ubicacion) {
-                    const ubicacionSpan = document.createElement('small');
-                    ubicacionSpan.className = 'text-muted d-block mt-2';
-                    ubicacionSpan.textContent = `📍 ${nota.ubicacion.ciudad}, ${nota.ubicacion.estado}, ${nota.ubicacion.pais}`;
-                    li.appendChild(ubicacionSpan);
-                }
-                
+                li.className = "list-group-item";
+                li.textContent = nota.texto;
                 lista.appendChild(li);
-                contadorNotas++;
-                ultimoCursor = cursor.key;
-            }
-            advanced = true;
-            cursor.continue();
+            });
         };
-
     } catch (error) {
         console.error('Error loading notes:', error);
-        cargandoNotas = false;
     }
 }
 
@@ -246,10 +242,10 @@ function setupInfiniteScroll() {
     observer.observe(sentinel);
 }
 
-// For testing purposes
+// Make functions available globally and export for testing
+window.guardarNota = guardarNota;
+window.cargarNotas = cargarNotas;
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        guardarNota,
-        initDB
-    };
+    module.exports = { guardarNota, initDB };
 }
