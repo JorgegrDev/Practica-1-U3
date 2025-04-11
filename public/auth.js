@@ -1,3 +1,8 @@
+// Check if Firebase is initialized
+if (typeof firebase === 'undefined') {
+    throw new Error('Firebase SDK not found! Make sure you have included the Firebase scripts.');
+}
+
 async function handleLogin(event) {
     event.preventDefault();
     
@@ -14,7 +19,7 @@ async function handleLogin(event) {
         window.location.href = 'index.html';
     } catch (error) {
         console.error('Login error:', error);
-        alert('Error al iniciar sesión: ' + error.message);
+        alert('Error logging in: ' + error.message);
     }
 }
 
