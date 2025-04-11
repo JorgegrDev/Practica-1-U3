@@ -1,4 +1,4 @@
-const { guardarNota, initDB } = require('./public/script');
+const { guardarNota, initDB } = require('./public/script.js');
 require('fake-indexeddb/auto');
 
 describe('Note Taking App', () => {

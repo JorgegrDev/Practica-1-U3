@@ -1,11 +1,13 @@
 let db;
 
-function initDB() {
+async function initDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("NotasDB", 1);
-
-        request.onerror = () => {
-            reject(request.error);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            db = request.result;
+            resolve(db);
         };
 
         request.onupgradeneeded = (event) => {
@@ -13,11 +15,6 @@ function initDB() {
             if (!db.objectStoreNames.contains('notas')) {
                 db.createObjectStore("notas", { keyPath: "id", autoIncrement: true });
             }
-        };
-
-        request.onsuccess = (event) => {
-            db = event.target.result;
-            resolve(db);
         };
     });
 }
@@ -121,6 +118,16 @@ async function solicitarUbicacion() {
         alert(error.message || 'No se pudo obtener la ubicación. Por favor, verifica los permisos.');
         return;
     }
+}
+
+async function guardarNota() {
+    if (!db) {
+        await initDB();
+    }
+    const nota = document.getElementById('nota').value;
+    const transaction = db.transaction(['notas'], 'readwrite');
+    const store = transaction.objectStore('notas');
+    return store.add({ texto: nota, fecha: new Date().toISOString() });
 }
 
 const NOTAS_POR_PAGINA = 10; // Number of notes to load at once
@@ -241,5 +248,8 @@ function setupInfiniteScroll() {
 
 // For testing purposes
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { guardarNota, initDB };
+    module.exports = {
+        guardarNota,
+        initDB
+    };
 }
