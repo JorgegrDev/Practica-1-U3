@@ -2,45 +2,49 @@ const { guardarNota, initDB } = require('./public/script.js');
 require('fake-indexeddb/auto');
 
 describe('Note Taking App', () => {
-    let db;
-
     beforeEach(async () => {
+        // Clear DOM
         document.body.innerHTML = `
             <textarea id="nota"></textarea>
             <ul id="listaNotas"></ul>
         `;
-        db = await initDB();
+        
+        // Initialize DB
+        await initDB();
     });
 
-    test('guardarNota should save a note to IndexedDB', async () => {
+    afterEach(() => {
+        // Clean up
+        document.body.innerHTML = '';
+        indexedDB.deleteDatabase('NotasDB');
+    });
+
+    it('should save a note to IndexedDB', async () => {
         // Setup
         const testNote = "Test note";
         document.getElementById('nota').value = testNote;
         
         // Execute
-        await guardarNota();
+        const result = await guardarNota();
         
         // Assert
-        return new Promise((resolve, reject) => {
-            try {
-                const transaction = db.transaction(['notas'], 'readonly');
-                const store = transaction.objectStore('notas');
-                const request = store.getAll();
-                
-                request.onsuccess = () => {
-                    try {
-                        expect(request.result.length).toBe(1);
-                        expect(request.result[0].texto).toBe(testNote);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                
-                request.onerror = () => reject(request.error);
-            } catch (error) {
-                reject(error);
-            }
-        });
+        expect(result).toBeDefined();
+        
+        const db = await initDB();
+        const notes = await getAllNotes(db);
+        expect(notes.length).toBe(1);
+        expect(notes[0].texto).toBe(testNote);
     });
 });
+
+// Helper function to get all notes
+function getAllNotes(db) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['notas'], 'readonly');
+        const store = transaction.objectStore('notas');
+        const request = store.getAll();
+        
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
