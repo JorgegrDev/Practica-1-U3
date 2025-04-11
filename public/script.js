@@ -164,6 +164,64 @@ async function guardarNota() {
     }
 }
 
+async function guardarNotaConUbicacion() {
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+
+        const { latitude, longitude } = position.coords;
+        
+        // Get location details using Google Maps Geocoder
+        const geocoder = new google.maps.Geocoder();
+        const latlng = { lat: latitude, lng: longitude };
+        
+        const locationData = await new Promise((resolve, reject) => {
+            geocoder.geocode({ location: latlng }, (results, status) => {
+                if (status === "OK" && results[0]) {
+                    resolve(results[0]);
+                } else {
+                    reject(new Error('No se pudo obtener la ubicación'));
+                }
+            });
+        });
+
+        const nota = document.getElementById('nota').value;
+        if (!nota.trim()) {
+            throw new Error('La nota no puede estar vacía');
+        }
+
+        const db = await initDB();
+        const transaction = db.transaction(['notas'], 'readwrite');
+        const store = transaction.objectStore('notas');
+
+        const notaObj = {
+            texto: nota,
+            fecha: new Date().toISOString(),
+            ubicacion: {
+                coords: { latitude, longitude },
+                direccion: locationData.formatted_address,
+                ciudad: locationData.address_components.find(c => c.types.includes("locality"))?.long_name || "",
+                estado: locationData.address_components.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "",
+                pais: locationData.address_components.find(c => c.types.includes("country"))?.long_name || ""
+            }
+        };
+
+        await new Promise((resolve, reject) => {
+            const request = store.add(notaObj);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+
+        document.getElementById('nota').value = '';
+        await cargarNotas();
+
+    } catch (error) {
+        console.error('Error al guardar nota con ubicación:', error);
+        alert('Error al guardar la nota con ubicación: ' + error.message);
+    }
+}
+
 const NOTAS_POR_PAGINA = 10; // Number of notes to load at once
 let ultimoCursor = null;
 let cargandoNotas = false;
@@ -186,7 +244,17 @@ async function cargarNotas() {
             notas.forEach(nota => {
                 const li = document.createElement("li");
                 li.className = "list-group-item";
-                li.textContent = nota.texto;
+                
+                let contenido = nota.texto;
+                if (nota.ubicacion) {
+                    contenido += `
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-geo-alt"></i> 
+                            ${nota.ubicacion.ciudad}, ${nota.ubicacion.estado}, ${nota.ubicacion.pais}
+                        </small>`;
+                }
+                
+                li.innerHTML = contenido;
                 lista.appendChild(li);
             });
         };
@@ -268,6 +336,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Make functions available globally
 window.guardarNota = guardarNota;
+window.guardarNotaConUbicacion = guardarNotaConUbicacion;
 window.cargarNotas = cargarNotas;
 window.initDB = initDB;
 

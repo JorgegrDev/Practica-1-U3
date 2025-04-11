@@ -24,9 +24,14 @@
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <textarea id="nota" class="form-control mb-3" placeholder="Escribe tu nota..." rows="3"></textarea>
-                        <button onclick="guardarNota()" class="btn btn-primary">
-                            Guardar Nota
-                        </button>
+                        <div class="btn-group" role="group">
+                            <button onclick="guardarNota()" class="btn btn-primary">
+                                <i class="bi bi-save"></i> Guardar Nota
+                            </button>
+                            <button onclick="guardarNotaConUbicacion()" class="btn btn-success">
+                                <i class="bi bi-geo-alt"></i> Guardar con Ubicación
+                            </button>
+                        </div>
                         <ul id="listaNotas" class="list-group mt-4"></ul>
                     </div>
                 </div>
