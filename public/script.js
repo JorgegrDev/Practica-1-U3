@@ -1,29 +1,29 @@
-let db;
+let db = null;
 
 async function initDB() {
+    if (db) return db;
+    
     return new Promise((resolve, reject) => {
         const request = indexedDB.open("NotasDB", 1);
         
-        request.onerror = (event) => {
-            console.error("Database error:", event.target.error);
-            reject(event.target.error);
+        request.onerror = () => {
+            console.error("Database error:", request.error);
+            reject(request.error);
         };
         
         request.onsuccess = (event) => {
-            console.log("Database opened successfully");
             db = event.target.result;
+            console.log("Database initialized successfully");
             resolve(db);
         };
 
         request.onupgradeneeded = (event) => {
-            console.log("Database upgrade needed");
-            db = event.target.result;
-            if (!db.objectStoreNames.contains('notas')) {
-                const store = db.createObjectStore("notas", { 
-                    keyPath: "id", 
+            const database = event.target.result;
+            if (!database.objectStoreNames.contains('notas')) {
+                database.createObjectStore('notas', { 
+                    keyPath: 'id', 
                     autoIncrement: true 
                 });
-                store.createIndex("fecha", "fecha", { unique: false });
             }
         };
     });
@@ -114,9 +114,7 @@ async function solicitarUbicacion() {
             }
         };
 
-        if (!db) {
-            await initDB();
-        }
+        const db = await initDB();
         const transaction = db.transaction(['notas'], 'readwrite');
         const store = transaction.objectStore('notas');
         await store.add(notaObj);
@@ -132,47 +130,36 @@ async function solicitarUbicacion() {
 
 async function guardarNota() {
     try {
-        if (!db) {
-            console.log("Initializing database...");
-            await initDB();
-        }
+        const db = await initDB();
+        const nota = document.getElementById('nota').value;
         
-        const notaText = document.getElementById('nota').value;
-        if (!notaText.trim()) {
-            throw new Error('La nota no puede estar vacía');
+        if (!nota.trim()) {
+            throw new Error('Note cannot be empty');
         }
 
         return new Promise((resolve, reject) => {
-            console.log("Starting transaction...");
             const transaction = db.transaction(['notas'], 'readwrite');
             const store = transaction.objectStore('notas');
             
-            const nota = {
-                texto: notaText,
+            const request = store.add({
+                texto: nota,
                 fecha: new Date().toISOString()
-            };
+            });
 
-            console.log("Adding note:", nota);
-            const request = store.add(nota);
-
-            request.onsuccess = (event) => {
-                console.log("Note saved successfully:", event.target.result);
+            request.onsuccess = () => {
+                console.log("Note saved:", request.result);
                 document.getElementById('nota').value = '';
                 cargarNotas();
-                resolve(event.target.result);
+                resolve(request.result);
             };
 
-            request.onerror = (event) => {
-                console.error("Error saving note:", event.target.error);
-                reject(event.target.error);
-            };
-
-            transaction.oncomplete = () => {
-                console.log("Transaction completed");
+            request.onerror = () => {
+                console.error("Save error:", request.error);
+                reject(request.error);
             };
         });
     } catch (error) {
-        console.error('Error in guardarNota:', error);
+        console.error("Error in guardarNota:", error);
         throw error;
     }
 }
@@ -183,9 +170,7 @@ let cargandoNotas = false;
 
 async function cargarNotas() {
     try {
-        if (!db) {
-            await initDB();
-        }
+        const db = await initDB();
 
         const lista = document.getElementById("listaNotas");
         lista.innerHTML = "";
