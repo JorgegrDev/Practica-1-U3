@@ -4,6 +4,7 @@
   "description": "PWA Notes Application",
   "main": "script.js",
   "scripts": {
+    "build": "react-scripts build",
     "test": "jest"
   },
   "keywords": [],
