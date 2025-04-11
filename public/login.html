@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://*.firebaseapp.com; connect-src 'self' https://*.firebase.io https://*.firebaseio.com wss://*.firebaseio.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.firebaseapp.com https://*.firebase.io https://*.firebaseio.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://*.firebaseapp.com; connect-src 'self' https://*.firebaseapp.com https://*.firebase.io https://*.firebaseio.com wss://*.firebaseio.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; frame-src 'self' https://*.firebaseapp.com;">
     
     <title>Login - Notas App</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js';
-        import { getAuth } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js';
-
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    
+    <!-- Initialize Firebase -->
+    <script>
         const firebaseConfig = {
             apiKey: "AIzaSyDxY2UGYMShQXTyIeowYQXXWg1YEm9UZjI",
             authDomain: "pwa-notas-2c422.firebaseapp.com",
@@ -22,11 +23,9 @@
             appId: "1:215526248771:web:d976e7af8e4bbcfc585ff6"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        window.auth = auth;
+        firebase.initializeApp(firebaseConfig);
     </script>
-    <script type="module" src="auth.js"></script>
+    <script src="auth.js"></script>
 </head>
 <body class="bg-light">
     <div class="container mt-5">
