@@ -24,17 +24,12 @@
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <textarea id="nota" class="form-control mb-3" placeholder="Escribe tu nota..." rows="3"></textarea>
-                        <div class="d-grid gap-2 d-md-flex">
-                            <button onclick="solicitarUbicacion()" class="btn btn-primary me-md-2">
-                                <i class="bi bi-geo-alt"></i> Guardar con Ubicación
-                            </button>
-                            <button onclick="limpiarNotas()" class="btn btn-danger">
-                                <i class="bi bi-trash"></i> Limpiar Notas
-                            </button>
-                        </div>
+                        <button onclick="guardarNota()" class="btn btn-primary">
+                            Guardar Nota
+                        </button>
+                        <ul id="listaNotas" class="list-group mt-4"></ul>
                     </div>
                 </div>
-                <ul id="listaNotas" class="list-group mt-4"></ul>
             </div>
         </div>
     </div>
