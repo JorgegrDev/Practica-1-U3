@@ -2,28 +2,22 @@ let db;
 
 function initDB() {
     return new Promise((resolve, reject) => {
-        // Primero borramos la base de datos existente
-        const deleteRequest = indexedDB.deleteDatabase("NotasDB");
-        
-        deleteRequest.onsuccess = () => {
-            // Creamos una nueva base de datos
-            const request = indexedDB.open("NotasDB", 1);
-            
-            request.onerror = () => {
-                reject(request.error);
-            };
+        const request = indexedDB.open("NotasDB", 1);
 
-            request.onupgradeneeded = (event) => {
-                db = event.target.result;
-                if (!db.objectStoreNames.contains('notas')) {
-                    db.createObjectStore("notas", { keyPath: "id", autoIncrement: true });
-                }
-            };
+        request.onerror = () => {
+            reject(request.error);
+        };
 
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                resolve(db);
-            };
+        request.onupgradeneeded = (event) => {
+            db = event.target.result;
+            if (!db.objectStoreNames.contains('notas')) {
+                db.createObjectStore("notas", { keyPath: "id", autoIncrement: true });
+            }
+        };
+
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            resolve(db);
         };
     });
 }
