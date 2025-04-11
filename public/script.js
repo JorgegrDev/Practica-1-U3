@@ -1,29 +1,30 @@
-let db;
+let db = null;
 
-function initDB() {
+async function initDB() {
+    if (db) return db;
+    
     return new Promise((resolve, reject) => {
-        // Primero borramos la base de datos existente
-        const deleteRequest = indexedDB.deleteDatabase("NotasDB");
+        const request = indexedDB.open("NotasDB", 1);
         
-        deleteRequest.onsuccess = () => {
-            // Creamos una nueva base de datos
-            const request = indexedDB.open("NotasDB", 1);
-            
-            request.onerror = () => {
-                reject(request.error);
-            };
+        request.onerror = () => {
+            console.error("Database error:", request.error);
+            reject(request.error);
+        };
+        
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            console.log("Database initialized successfully");
+            resolve(db);
+        };
 
-            request.onupgradeneeded = (event) => {
-                db = event.target.result;
-                if (!db.objectStoreNames.contains('notas')) {
-                    db.createObjectStore("notas", { keyPath: "id", autoIncrement: true });
-                }
-            };
-
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                resolve(db);
-            };
+        request.onupgradeneeded = (event) => {
+            const database = event.target.result;
+            if (!database.objectStoreNames.contains('notas')) {
+                database.createObjectStore('notas', { 
+                    keyPath: 'id', 
+                    autoIncrement: true 
+                });
+            }
         };
     });
 }
@@ -113,9 +114,7 @@ async function solicitarUbicacion() {
             }
         };
 
-        if (!db) {
-            await initDB();
-        }
+        const db = await initDB();
         const transaction = db.transaction(['notas'], 'readwrite');
         const store = transaction.objectStore('notas');
         await store.add(notaObj);
@@ -129,62 +128,142 @@ async function solicitarUbicacion() {
     }
 }
 
+async function guardarNota() {
+    try {
+        const db = await initDB();
+        const nota = document.getElementById('nota').value;
+        
+        if (!nota.trim()) {
+            throw new Error('Note cannot be empty');
+        }
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['notas'], 'readwrite');
+            const store = transaction.objectStore('notas');
+            
+            const request = store.add({
+                texto: nota,
+                fecha: new Date().toISOString()
+            });
+
+            request.onsuccess = () => {
+                console.log("Note saved:", request.result);
+                document.getElementById('nota').value = '';
+                cargarNotas();
+                resolve(request.result);
+            };
+
+            request.onerror = () => {
+                console.error("Save error:", request.error);
+                reject(request.error);
+            };
+        });
+    } catch (error) {
+        console.error("Error in guardarNota:", error);
+        throw error;
+    }
+}
+
+async function guardarNotaConUbicacion() {
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+
+        const { latitude, longitude } = position.coords;
+        
+        // Get location details using Google Maps Geocoder
+        const geocoder = new google.maps.Geocoder();
+        const latlng = { lat: latitude, lng: longitude };
+        
+        const locationData = await new Promise((resolve, reject) => {
+            geocoder.geocode({ location: latlng }, (results, status) => {
+                if (status === "OK" && results[0]) {
+                    resolve(results[0]);
+                } else {
+                    reject(new Error('No se pudo obtener la ubicación'));
+                }
+            });
+        });
+
+        const nota = document.getElementById('nota').value;
+        if (!nota.trim()) {
+            throw new Error('La nota no puede estar vacía');
+        }
+
+        const db = await initDB();
+        const transaction = db.transaction(['notas'], 'readwrite');
+        const store = transaction.objectStore('notas');
+
+        const notaObj = {
+            texto: nota,
+            fecha: new Date().toISOString(),
+            ubicacion: {
+                coords: { latitude, longitude },
+                direccion: locationData.formatted_address,
+                ciudad: locationData.address_components.find(c => c.types.includes("locality"))?.long_name || "",
+                estado: locationData.address_components.find(c => c.types.includes("administrative_area_level_1"))?.long_name || "",
+                pais: locationData.address_components.find(c => c.types.includes("country"))?.long_name || ""
+            }
+        };
+
+        await new Promise((resolve, reject) => {
+            const request = store.add(notaObj);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+
+        document.getElementById('nota').value = '';
+        await cargarNotas();
+
+    } catch (error) {
+        console.error('Error al guardar nota con ubicación:', error);
+        alert('Error al guardar la nota con ubicación: ' + error.message);
+    }
+}
+
 const NOTAS_POR_PAGINA = 10; // Number of notes to load at once
 let ultimoCursor = null;
 let cargandoNotas = false;
 
-async function cargarNotas(cargarMas = false) {
-    if (!db || cargandoNotas) return;
-    
+async function cargarNotas() {
     try {
-        cargandoNotas = true;
-        const lista = document.getElementById("listaNotas");
-        
-        if (!cargarMas) {
-            lista.innerHTML = "";
-            ultimoCursor = null;
-        }
+        const db = await initDB();
 
+        const lista = document.getElementById("listaNotas");
+        lista.innerHTML = "";
+        
         const transaction = db.transaction(["notas"], "readonly");
         const store = transaction.objectStore("notas");
-        
-        let advanced = !ultimoCursor;
-        const cursorRequest = store.openCursor(ultimoCursor);
-        let contadorNotas = 0;
+        const request = store.getAll();
 
-        cursorRequest.onsuccess = event => {
-            const cursor = event.target.result;
-            if (!cursor || contadorNotas >= NOTAS_POR_PAGINA) {
-                cargandoNotas = false;
-                return;
-            }
-
-            if (advanced) {
+        request.onsuccess = () => {
+            const notas = request.result;
+            console.log("Notes loaded:", notas);
+            
+            notas.forEach(nota => {
                 const li = document.createElement("li");
-                li.className = "list-group-item list-group-item-action mb-2 shadow-sm";
-                const nota = cursor.value;
+                li.className = "list-group-item";
                 
-                const textNode = document.createTextNode(nota.texto);
-                li.appendChild(textNode);
-                
+                let contenido = nota.texto;
                 if (nota.ubicacion) {
-                    const ubicacionSpan = document.createElement('small');
-                    ubicacionSpan.className = 'text-muted d-block mt-2';
-                    ubicacionSpan.textContent = `📍 ${nota.ubicacion.ciudad}, ${nota.ubicacion.estado}, ${nota.ubicacion.pais}`;
-                    li.appendChild(ubicacionSpan);
+                    contenido += `
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-geo-alt"></i> 
+                            ${nota.ubicacion.ciudad}, ${nota.ubicacion.estado}, ${nota.ubicacion.pais}
+                        </small>`;
                 }
                 
+                li.innerHTML = contenido;
                 lista.appendChild(li);
-                contadorNotas++;
-                ultimoCursor = cursor.key;
-            }
-            advanced = true;
-            cursor.continue();
+            });
         };
 
+        request.onerror = (event) => {
+            console.error("Error loading notes:", event.target.error);
+        };
     } catch (error) {
-        console.error('Error loading notes:', error);
-        cargandoNotas = false;
+        console.error('Error in cargarNotas:', error);
     }
 }
 
@@ -245,7 +324,22 @@ function setupInfiniteScroll() {
     observer.observe(sentinel);
 }
 
-// For testing purposes
+// Initialize database when the page loads
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await initDB();
+        await cargarNotas();
+    } catch (error) {
+        console.error('Error initializing app:', error);
+    }
+});
+
+// Make functions available globally
+window.guardarNota = guardarNota;
+window.guardarNotaConUbicacion = guardarNotaConUbicacion;
+window.cargarNotas = cargarNotas;
+window.initDB = initDB;
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { guardarNota, initDB };
 }
